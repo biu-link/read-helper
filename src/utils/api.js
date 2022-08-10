@@ -20,3 +20,12 @@ export function translate(content) {
     method: 'get'
   });
 }
+
+export function tts(word) {
+
+  return request({
+    url: `https://translate.google.com/translate_tts?ie=UTF-8&idx=0&tl=en&client=dict-chrome-ex&total=1&textlen=4&q=${encodeURIComponent(word)}&ttsspeed=1`,
+    method: 'get',
+    responseType: 'arraybuffer',
+  });
+}

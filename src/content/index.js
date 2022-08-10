@@ -26,12 +26,19 @@ initVue();
 function handleExtensionMessage(request) {
   if (request.command === "open-read-helper-extension") {
     props.show = !props.show;
-  } else if (request.command === "close-read-helper-extension") {
-    props.show = false;
-    const box = document.getElementById("read_helper_extension_box");
-    if (box) {
-      box.remove();
+    if (!props.show) {
+      close();
     }
+  } else if (request.command === "close-read-helper-extension") {
+    close();
+  }
+}
+
+function close() {
+  props.show = false;
+  const box = document.getElementById("read_helper_extension_box");
+  if (box) {
+    box.remove();
   }
 }
 

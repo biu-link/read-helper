@@ -1,4 +1,4 @@
-import {translate} from "../utils/api.js";
+import {translate, tts} from "../utils/api.js";
 
 console.info('chrome-ext template-vue-js background script')
 
@@ -21,6 +21,14 @@ chrome.runtime.onMessage.addListener(
           sendResponse(res.data)
         });
         break;
+
+      case 'tts':
+        tts(data.content).then((res) => {
+          const base64String = btoa(String.fromCharCode(...new Uint8Array(res.data)));
+          sendResponse(base64String);
+        })
+        break;
+
     }
 
     // return true keeps the sendResponse function valid

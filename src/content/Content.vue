@@ -1,9 +1,9 @@
 <template>
-  <div class="read-helper-wrapper" v-if="show" @click="onClick" @mousemove="onMouseMove">
-    <div class="tool-bar">
-      <span @click="hide" class="close-read-helper">Hide</span>
+  <div id="read-helper-wrapper" v-if="show" @click="onClick" @mousemove="onMouseMove">
+    <div id="read-helper-tool-bar">
+      <span @click="hide" id="close-read-helper">Close</span>
     </div>
-    <div v-if="result && result.sentences" id="content-box" @mouseup="onSelectionChange">
+    <div v-if="result && result.sentences" id="content-box">
       <ul>
         <li v-for="(item, index) in result.sentences" :key="index">
           <span class="origin">
@@ -13,6 +13,15 @@
           <p class="result">{{ item.trans }}</p>
         </li>
       </ul>
+    </div>
+    <div v-else id="content-box" class="read-helper-tip">
+      <div>
+        <ul>
+          <li>点击目标区域进行翻译</li>
+          <li>按住 Alt 移动鼠标到目标区域进行翻译</li>
+          <li>F2 朗读鼠标所指单词</li>
+        </ul>
+      </div>
     </div>
     <div v-if="selectionTranslate && selectionTranslate.sentences" id="selection-box">
       <div v-for="(item, index) in selectionTranslate.sentences" :key="index">
@@ -34,6 +43,7 @@
 <script setup>
 import {computed, onMounted, ref, watchEffect} from "vue";
 import {debounce} from "../utils/tool.js";
+import {Howl, Howler} from 'howler';
 
 const props = defineProps({
   show: Boolean,
@@ -41,8 +51,11 @@ const props = defineProps({
 
 const text = ref('');
 const result = ref(undefined);
+const selectionContent = ref('');
 const selectionTranslate = ref(undefined);
 const currentWord = ref('');
+const lastTTSWord = ref('');
+const lastTTSAudio = ref('');
 let lastContent = null;
 
 const debounceTranslate = debounce(translate, 200);
@@ -52,6 +65,14 @@ const debounceGetWordAtPoint = debounce(getWordAtPoint, 100);
 async function hide() {
   chrome.runtime.sendMessage({command: "close-read-helper-extension"});
 }
+
+watchEffect(() => {
+  if (!props.show) {
+    result.value = undefined;
+    currentWord.value = '';
+    selectionTranslate.value = undefined;
+  }
+})
 
 function onClick(e) {
   e.stopPropagation();
@@ -66,7 +87,10 @@ function onSelectionChange(e) {
   selection = selection.trim();
   if (selection && selection.length > 0) {
     translateWord(selection)
+    selectionContent.value = selection;
   } else {
+    selectionContent.value = '';
+    debounceGetWordAtPoint(e.x, e.y);
     // setTimeout(()=>{}, 1000);
   }
 }
@@ -76,6 +100,7 @@ function translateWord(word) {
   if (word.endsWith(',')) {
     word = word.substring(0, word.length - 1).trim();
   }
+
   chrome.runtime.sendMessage({
     command: "translate",
     data: {
@@ -84,6 +109,7 @@ function translateWord(word) {
   }, (res) => {
     console.info('res:', res);
     selectionTranslate.value = res;
+    currentWord.value = word;
   });
 }
 
@@ -122,6 +148,25 @@ function init() {
     debounceGetWordAtPoint(e.x, e.y);
   });
 
+  document.addEventListener('keydown', (e) => {
+    if (!props.show) {
+      return;
+    }
+    if (e.key === 'F2') {
+      setTimeout(tts, 50);
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!props.show) {
+      return;
+    }
+
+    setTimeout(() => {
+      onSelectionChange(e)
+    }, 50);
+  });
+
 }
 
 function showSelectionBox(e) {
@@ -137,14 +182,18 @@ function showSelectionBox(e) {
   let rect = e.target.getBoundingClientRect();
   let scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
   let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+  const bodyRect = document.getElementsByTagName("body")[0].getBoundingClientRect();
+  const gap = scrollTop - Math.abs(bodyRect.top);
+
   const pos = {
     left: rect.left + scrollLeft - 5,
-    top: rect.top + scrollTop - 5,
+    top: rect.top + scrollTop - 5 - gap,
     width: rect.width + 6,
     height: rect.height + 6
   };
 
-  box.setAttribute('style', `box-sizing: content-box; pointer-events: none; position:absolute; border: 2px solid #ed4014; `
+  box.setAttribute('style', `z-index: 999999; box-sizing: content-box; pointer-events: none; position:absolute; border: 2px solid #ed4014; `
       + `top:${pos.top}px; left:${pos.left}px; height:${pos.height}px; width:${pos.width}px;`);
 
 }
@@ -180,15 +229,72 @@ function translate(content) {
   });
 }
 
+function tts() {
+  const word = currentWord.value;
+  if (word.length <= 1) {
+    return;
+  }
+
+  if (word === lastTTSWord.value) {
+    playAudio(word, lastTTSAudio.value);
+    return;
+  }
+
+  chrome.runtime.sendMessage({
+    command: "tts",
+    data: {
+      content: word,
+    }
+  }, (res) => {
+    playAudio(word, res);
+  });
+}
+
+function playAudio(word, audio) {
+
+  lastTTSWord.value = word;
+  lastTTSAudio.value = audio;
+
+  const sound = new Howl({
+    src: `data:audio/ogg;base64,${audio}`,
+    html5: true,
+    onloaderror(id, error) {
+      lastTTSWord.value = '';
+      console.info('audio player load error:', id, error);
+    },
+
+    onplayerror(id, error) {
+      lastTTSWord.value = '';
+      console.info('audio player play error:', id, error);
+    },
+
+  });
+
+  sound.play();
+}
+
 function getWordAtPoint(x, y) {
+
+  if (selectionContent.value) {
+    return;
+  }
+
   var range = document.caretRangeFromPoint(x, y);
 
   if (range.startContainer.nodeType === Node.TEXT_NODE) {
     range.expand('word');
-    const word = range.toString().trim();
-    currentWord.value = word;
+    let word = range && range.toString();
     if (word) {
-      translateWord(word);
+      word = word.trim();
+    }
+    if (word.length <= 1) {
+      return;
+    }
+    if (word !== currentWord.value) {
+      currentWord.value = word;
+      if (word) {
+        translateWord(word);
+      }
     }
   }
 
@@ -208,12 +314,16 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.read-helper-wrapper {
+#read-helper-wrapper {
   position: fixed;
   right: 10px;
   top: 10px;
   bottom: 10px;
   width: 250px;
+  font-size: 12px;
+  line-height: 14px;
+
+  text-align: left;
 
   padding: 0 4px 10px 4px;
 
@@ -223,7 +333,7 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0px 0px 10px #494949;
 
-  z-index: 9999;
+  z-index: 9999999;
 
   display: flex;
   flex-direction: column;
@@ -232,19 +342,18 @@ onMounted(() => {
     opacity: 1;
   }
 
-  .tool-bar {
+  #read-helper-tool-bar {
     text-align: right;
-    padding: 10px 0 0 10px;
+    padding: 10px 5px 0 10px;
     flex: none;
-    font-size: 12px;
 
-    .close-read-helper {
+    #close-read-helper {
       display: inline-block;
-      padding: 2px 5px;
+      padding: 4px 5px;
       border: 1px solid #999999;
       border-radius: 4px;
       cursor: pointer;
-      background-color: #d0d0d0;
+      background-color: #dedede;
 
       &:hover {
         background-color: #efefef;
@@ -292,6 +401,26 @@ onMounted(() => {
       line-height: 20px;
       margin: 0 0 10px 0;
     }
+
+    .current-word {
+      background-color: gold;
+    }
+
+    .result {
+      line-height: 20px;
+    }
+
+    &.read-helper-tip {
+      padding: 6px !important;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      div {
+        font-size: 12px !important;
+        color: #3f3f3f !important;
+      }
+    }
   }
 
   #selection-box {
@@ -303,14 +432,6 @@ onMounted(() => {
     .origin {
       margin-bottom: 5px;
     }
-  }
-
-  .result {
-    line-height: 20px;
-  }
-
-  .current-word {
-    background-color: gold;
   }
 
 }

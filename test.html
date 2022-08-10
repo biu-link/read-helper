@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+
+    <script src="https://cdn.static.runoob.com/libs/jquery/1.8.3/jquery.js"></script>
+
+</head>
+<body>
+
+
+    <button onclick="play()">play</button>
+
+    <div id="twitterFeed"></div>
+
+
+<script>
+
+  function play() {
+
+    // var sound = new Howl({
+    //   src: ['https://translate.google.com/translate_tts?ie=UTF-8&idx=0&tl=en&client=dict-chrome-ex&total=1&textlen=4&q=need&ttsspeed=1'],
+    //   format: ['dolby', 'webm', 'mp3'],
+    //   html5: true,
+    //   onloaderror: function(a, b) {
+    //     console.info(a, b);
+    //   },
+    //   onplayerror: function(a, b) {
+    //     console.info(a, b);
+    //   }
+    // });
+    //
+    // setTimeout(()=>{
+    //   console.info('play');
+    //   sound.play();
+    // }, 1000);
+
+    $(document).ready(function(){
+      $.ajax({
+        url: 'https://translate.google.com/translate_tts?ie=UTF-8&idx=0&tl=en&client=dict-chrome-ex&total=1&textlen=4&q=need&ttsspeed=1',
+        dataType: 'jsonp',
+        success: function(dataWeGotViaJsonp){
+          var text = '';
+          var len = dataWeGotViaJsonp.length;
+          for(var i=0;i<len;i++){
+            twitterEntry = dataWeGotViaJsonp[i];
+            text += '<p><img src = "' + twitterEntry.user.profile_image_url_https +'"/>' + twitterEntry['text'] + '</p>'
+          }
+          $('#twitterFeed').html(text);
+        }
+      });
+    })
+
+
+  }
+
+</script>
+
+</body>
+</html>
