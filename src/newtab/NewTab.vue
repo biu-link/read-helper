@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from "vue";
 
-const crx = ref("read-helper");
+const crx = ref("Read-Helper");
 </script>
 
 <template>

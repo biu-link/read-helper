@@ -1,5 +1,8 @@
 <template>
-  <div id="read-helper-wrapper" v-if="show" @click="onClick" @mousemove="onMouseMove">
+  <div id="read-helper-wrapper" v-if="show"
+       @click.stop="()=>{}"
+       @mousemove.stop="()=>{}"
+  >
     <div id="read-helper-tool-bar">
       <span @click="hide" id="close-read-helper">Close</span>
     </div>
@@ -25,8 +28,15 @@
     </div>
     <div v-if="selectionTranslate && selectionTranslate.sentences" id="selection-box">
       <div v-for="(item, index) in selectionTranslate.sentences" :key="index">
-        <input class="origin" :value="item.orig" @change="translateWord($event.target.value)">
-        <p class="result"><a :href='`https://dict.youdao.com/result?word=${encodeURIComponent(item.orig)}&lang=en`'
+        <input class="origin"
+               :value="item.orig"
+               @change="translateWord($event.target.value)"
+               @click.stop="()=>{}"
+               @mousemove.stop="()=>{}"
+               @keydown.stop="()=>{}"
+               @mouseup.stop="()=>{}"
+        >
+        <p class="result"><a :href='transUrl(item.orig)'
                              target="_blank">{{ item.trans }}</a>
         </p>
         <ul v-if="selectionTranslate.dict">
@@ -56,6 +66,8 @@ const selectionTranslate = ref(undefined);
 const currentWord = ref('');
 const lastTTSWord = ref('');
 const lastTTSAudio = ref('');
+const translateSite = ref('Google');
+
 let lastContent = null;
 
 const debounceTranslate = debounce(translate, 200);
@@ -73,14 +85,6 @@ watchEffect(() => {
     selectionTranslate.value = undefined;
   }
 })
-
-function onClick(e) {
-  e.stopPropagation();
-}
-
-function onMouseMove(e) {
-  e.stopPropagation();
-}
 
 function onSelectionChange(e) {
   let selection = document.getSelection().toString();
@@ -114,6 +118,12 @@ function translateWord(word) {
 }
 
 function init() {
+
+  chrome.storage.local.get(['translateSite'], (result)=>{
+    if (result && result.translateSite) {
+      translateSite.value = result.translateSite;
+    }
+  })
 
   document.addEventListener('click', (e) => {
     if (!props.show) {
@@ -304,6 +314,14 @@ function getWordAtPoint(x, y) {
 const matchWord = computed(() => (word) => {
   if (currentWord.value && word && word.indexOf(currentWord.value) >= 0) {
     return true;
+  }
+});
+
+const transUrl = computed(() => (word)=>{
+  if (translateSite.value === 'Youdao') {
+    return `https://dict.youdao.com/result?word=${encodeURIComponent(word)}&lang=en`;
+  } else if (translateSite.value === 'Google') {
+    return `https://translate.google.com/?sl=en&tl=zh-CN&text=${encodeURIComponent(word)}&op=translate`;
   }
 });
 

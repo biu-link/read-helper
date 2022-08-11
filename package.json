@@ -9,7 +9,7 @@
     "chrome-extension",
     "vue",
     "vite",
-    "read-helper"
+    "Read-Helper"
   ],
   "engines": {
     "node": ">=14.18.0"

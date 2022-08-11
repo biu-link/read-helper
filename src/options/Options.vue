@@ -1,18 +1,47 @@
-<script setup>
-import { ref } from 'vue'
-
-const crx = ref('read-helper')
-</script>
-
 <template>
   <main>
-    <h3>Options Page!</h3>
+    <h3>Read-Helper Options</h3>
 
-    <h6>v 0.0.0</h6>
+    <h6>v 0.0.1</h6>
 
-    <a href="https://www.npmjs.com/package/read-helper" target="_blank">Power by {{ crx }}</a>
+    <label>External translation website: </label>
+    <select id="translateSite" v-model="translateSite">
+      <option value="Google">Google</option>
+      <option value="Youdao">Youdao</option>
+    </select>
+
+    <br>
+    <br>
+
+    <button @click="onSave">Save</button>
+    <br>
+    <br>
+
+    <a href="#">Power by {{ crx }}</a>
   </main>
 </template>
+
+<script setup>
+import {ref} from 'vue'
+
+const crx = ref('biu.link')
+const translateSite = ref('Google');
+
+function onSave() {
+  chrome.storage.local.set({translateSite: translateSite.value});
+}
+
+function init() {
+  chrome.storage.local.get(['translateSite'], (result)=>{
+    console.info('local storage:', result);
+    translateSite.value = result.translateSite;
+  });
+}
+
+init();
+
+</script>
+
 
 <style>
 main {
@@ -23,7 +52,6 @@ main {
 
 h3 {
   color: #42b983;
-  text-transform: uppercase;
   font-size: 1.5rem;
   font-weight: 200;
   line-height: 1.2rem;

@@ -1,7 +1,7 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 
 export default defineManifest({
-  name: 'read-helper',
+  name: 'Read-Helper',
   description: '',
   version: '0.0.1',
   manifest_version: 3,
@@ -31,5 +31,7 @@ export default defineManifest({
       matches: [],
     },
   ],
-  permissions: [],
+  permissions: [
+    'storage'
+  ],
 })
