@@ -190,15 +190,14 @@ function showSelectionBox(e) {
   }
 
   let rect = e.target.getBoundingClientRect();
-  let scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-  let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+  const body = document.getElementsByTagName("body")[0];
+  const bodyRect = body.getBoundingClientRect();
 
-  const bodyRect = document.getElementsByTagName("body")[0].getBoundingClientRect();
-  const gap = scrollTop - Math.abs(bodyRect.top);
+  body.style.position = "relative";
 
   const pos = {
-    left: rect.left + scrollLeft - 5,
-    top: rect.top + scrollTop - 5 - gap,
+    left: rect.left - bodyRect.left - 5,
+    top: rect.top - bodyRect.top - 5,
     width: rect.width + 6,
     height: rect.height + 6
   };
