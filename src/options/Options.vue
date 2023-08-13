@@ -2,7 +2,7 @@
   <main>
     <h3>Read-Helper Options</h3>
 
-    <h6>v 0.0.1</h6>
+    <h6>v 0.7.8</h6>
 
     <label>External translation website: </label>
     <select id="translateSite" v-model="translateSite">

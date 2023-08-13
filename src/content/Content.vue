@@ -1,9 +1,17 @@
 <template>
-  <div id="read-helper-wrapper" v-if="show"
+  <div id="read-helper-wrapper"
+       ref="readHelperWrapper"
+       :style="style"
+       v-if="show"
        @click.stop="()=>{}"
        @mousemove.stop="()=>{}"
   >
     <div id="read-helper-tool-bar">
+      <span @click.stop="clear"
+            @mousemove.stop="()=>{}"
+            @mouseup.stop="()=>{}"
+            id="clear-read-helper"
+      >Clear</span>
       <span @click="hide" id="close-read-helper">Close</span>
     </div>
     <div v-if="result && result.sentences" id="content-box">
@@ -27,13 +35,13 @@
       </div>
     </div>
     <div v-if="selectionTranslate && selectionTranslate.sentences" id="selection-box">
-      <div v-for="(item, index) in selectionTranslate.sentences" :key="index">
+      <div v-for="(item, index) in selectionTranslate.sentences" :key="index" id="selectionDiv">
         <input class="origin"
                :value="item.orig"
                @change="translateWord($event.target.value)"
                @click.stop="()=>{}"
                @mousemove.stop="()=>{}"
-               @keydown.stop="()=>{}"
+               @keydown.stop="onKeydown"
                @mouseup.stop="()=>{}"
         >
         <p class="result"><a :href='transUrl(item.orig)'
@@ -47,13 +55,15 @@
         </ul>
       </div>
     </div>
+    <textarea id="translate_content"></textarea>
   </div>
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watchEffect} from "vue";
+import {computed, nextTick, onMounted, ref, watchEffect} from "vue";
 import {debounce} from "../utils/tool.js";
 import {Howl, Howler} from 'howler';
+import {useDraggable} from '@vueuse/core'
 
 const props = defineProps({
   show: Boolean,
@@ -69,10 +79,25 @@ const lastTTSAudio = ref('');
 const translateSite = ref('Google');
 
 let lastContent = null;
+let lastMouseDownTarget = null;
 
 const debounceTranslate = debounce(translate, 200);
-
 const debounceGetWordAtPoint = debounce(getWordAtPoint, 100);
+
+const readHelperWrapper = ref();
+
+// `style` will be a helper computed for `left: ?px; top: ?px;`
+const {style} = useDraggable(readHelperWrapper, {
+  exact: true,
+  axis: 'x',
+  preventDefault: true,
+  stopPropagation: true,
+  initialValue: {
+    y: 10,
+    x: document.body.clientWidth - 10 - 250,
+  }
+
+})
 
 async function hide() {
   chrome.runtime.sendMessage({command: "close-read-helper-extension"});
@@ -87,6 +112,11 @@ watchEffect(() => {
 })
 
 function onSelectionChange(e) {
+  let target = document.getSelection().anchorNode;
+  if (target && target.id === 'selectionDiv') {
+    return;
+  }
+
   let selection = document.getSelection().toString();
   selection = selection.trim();
   if (selection && selection.length > 0) {
@@ -119,7 +149,7 @@ function translateWord(word) {
 
 function init() {
 
-  chrome.storage.local.get(['translateSite'], (result)=>{
+  chrome.storage.local.get(['translateSite'], (result) => {
     if (result && result.translateSite) {
       translateSite.value = result.translateSite;
     }
@@ -127,6 +157,10 @@ function init() {
 
   document.addEventListener('click', (e) => {
     if (!props.show) {
+      return;
+    }
+
+    if (e.target !== lastMouseDownTarget) {
       return;
     }
 
@@ -147,6 +181,11 @@ function init() {
       debounceTranslate(content);
 
       showSelectionBox(e);
+
+      const input = document.getElementById('translate_content');
+      input.value = content;
+      input.select();
+      document.execCommand('copy');
     }
   });
 
@@ -156,6 +195,15 @@ function init() {
     }
 
     debounceGetWordAtPoint(e.x, e.y);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!props.show) {
+      return;
+    }
+
+    lastMouseDownTarget = e.target;
+
   });
 
   document.addEventListener('keydown', (e) => {
@@ -177,7 +225,7 @@ function init() {
     }, 50);
   });
 
-}
+} // init
 
 function showSelectionBox(e) {
 
@@ -207,7 +255,7 @@ function showSelectionBox(e) {
 
 }
 
-function translate(content) {
+async function translate(content) {
   if (content && content.length > 5000) {
     content = content.substring(0, 5000);
   }
@@ -236,6 +284,7 @@ function translate(content) {
     console.info('res:', res);
     result.value = res;
   });
+
 }
 
 function tts() {
@@ -310,13 +359,37 @@ function getWordAtPoint(x, y) {
   return null;
 }
 
+function onKeydown(e) {
+  if (e.key === 'F2') {
+
+  } else {
+    e.stopPropagation();
+  }
+}
+
+function clear(e) {
+  text.value = '';
+  result.value = undefined;
+  selectionContent.value = '';
+  selectionTranslate.value = undefined;
+  currentWord.value = '';
+  lastContent = null;
+
+  const box = document.getElementById("read_helper_extension_box");
+  if (box) {
+    box.remove();
+  }
+
+  e.stopPropagation();
+}
+
 const matchWord = computed(() => (word) => {
   if (currentWord.value && word && word.indexOf(currentWord.value) >= 0) {
     return true;
   }
 });
 
-const transUrl = computed(() => (word)=>{
+const transUrl = computed(() => (word) => {
   if (translateSite.value === 'Youdao') {
     return `https://dict.youdao.com/result?word=${encodeURIComponent(word)}&lang=en`;
   } else if (translateSite.value === 'Google') {
@@ -333,8 +406,6 @@ onMounted(() => {
 <style lang="scss" scoped>
 #read-helper-wrapper {
   position: fixed;
-  right: 10px;
-  top: 10px;
   bottom: 10px;
   width: 250px;
   font-size: 12px;
@@ -350,7 +421,7 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0px 0px 10px #494949;
 
-  z-index: 9999999;
+  z-index: 9999999999;
 
   display: flex;
   flex-direction: column;
@@ -361,10 +432,12 @@ onMounted(() => {
 
   #read-helper-tool-bar {
     text-align: right;
+    width: 110px;
+    margin-left: 130px;
     padding: 10px 5px 0 10px;
     flex: none;
 
-    #close-read-helper {
+    #close-read-helper, #clear-read-helper {
       display: inline-block;
       padding: 4px 5px;
       border: 1px solid #999999;
@@ -374,6 +447,17 @@ onMounted(() => {
 
       &:hover {
         background-color: #efefef;
+      }
+    }
+
+    #clear-read-helper {
+      background-color: #67c23a;
+      border: 1px solid #67c23a;
+      margin-right: 5px;
+      color: #fff;
+
+      &:hover {
+        background-color: #95d475;
       }
     }
   }
@@ -448,7 +532,16 @@ onMounted(() => {
 
     .origin {
       margin-bottom: 5px;
+      width: 100%;
+      outline: none;
     }
+  }
+
+  #translate_content {
+    position: absolute;
+    top: -999px;
+    width: 1px;
+    height: 1px;
   }
 
 }

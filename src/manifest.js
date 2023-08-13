@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   name: 'Read-Helper',
   description: '',
-  version: '0.0.1',
+  version: '0.7.8',
   manifest_version: 3,
   icons: {
     16: 'img/logo-16.png',
@@ -32,6 +32,7 @@ export default defineManifest({
     },
   ],
   permissions: [
-    'storage'
+    'storage',
+    'clipboardWrite'
   ],
 })
